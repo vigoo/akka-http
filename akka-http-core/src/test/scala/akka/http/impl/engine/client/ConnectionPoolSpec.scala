@@ -527,12 +527,13 @@ class ConnectionPoolSpec extends AkkaSpec("""
       maxOpenRequests: Int                      = 8,
       pipeliningLimit: Int                      = 1,
       idleTimeout:     FiniteDuration           = 5.seconds,
+      requestTimeout:  Duration                 = Duration.Inf,
       ccSettings:      ClientConnectionSettings = ClientConnectionSettings(system)) = {
 
       val settings =
         new ConnectionPoolSettingsImpl(maxConnections, minConnections,
           maxRetries, maxOpenRequests, pipeliningLimit,
-          idleTimeout.dilated, ccSettings)
+          idleTimeout.dilated, requestTimeout, ccSettings)
       flowTestBench(
         Http().cachedHostConnectionPool[T](serverHostName, serverPort, settings))
     }
@@ -544,9 +545,10 @@ class ConnectionPoolSpec extends AkkaSpec("""
       maxOpenRequests: Int                      = 8,
       pipeliningLimit: Int                      = 1,
       idleTimeout:     FiniteDuration           = 5.seconds,
+      requestTimeout:  Duration                 = Duration.Inf,
       ccSettings:      ClientConnectionSettings = ClientConnectionSettings(system)) = {
       val settings = new ConnectionPoolSettingsImpl(maxConnections, minConnections, maxRetries, maxOpenRequests, pipeliningLimit,
-        idleTimeout.dilated, ClientConnectionSettings(system))
+        idleTimeout.dilated, requestTimeout, ClientConnectionSettings(system))
       flowTestBench(Http().superPool[T](settings = settings))
     }
 

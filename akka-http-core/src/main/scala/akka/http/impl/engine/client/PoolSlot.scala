@@ -5,6 +5,7 @@
 package akka.http.impl.engine.client
 
 import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
 
 import akka.event.LoggingAdapter
 import akka.http.impl.engine.client.PoolConductor.{ ConnectEagerlyCommand, DispatchCommand, SlotCommand }
@@ -20,6 +21,7 @@ import akka.stream.stage.GraphStageLogic.EagerTerminateOutput
 import akka.stream.stage.{ GraphStage, GraphStageLogic, InHandler, OutHandler }
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import scala.collection.JavaConverters._
 
@@ -42,8 +44,8 @@ private object PoolSlot {
     final case class ConnectedEagerly(slotIx: Int) extends SlotEvent
   }
 
-  def apply(slotIx: Int, connectionFlow: ConnectionFlow, log: LoggingAdapter): Graph[FanOutShape2[SlotCommand, ResponseContext, RawSlotEvent], Any] =
-    new SlotProcessor(slotIx, connectionFlow, log)
+  def apply(slotIx: Int, connectionFlow: ConnectionFlow, log: LoggingAdapter, requestTimeout: Duration): Graph[FanOutShape2[SlotCommand, ResponseContext, RawSlotEvent], Any] =
+    new SlotProcessor(slotIx, connectionFlow, log, requestTimeout)
 
   /**
    * To the outside it provides a stable flow stage, consuming `SlotCommand` instances on its
@@ -52,7 +54,7 @@ private object PoolSlot {
    * Completion and errors from the connection are not surfaced to the outside (unless we are
    * shutting down completely).
    */
-  private class SlotProcessor(slotIx: Int, connectionFlow: ConnectionFlow, val log: LoggingAdapter)
+  private class SlotProcessor(slotIx: Int, connectionFlow: ConnectionFlow, val log: LoggingAdapter, requestTimeout: Duration)
     extends GraphStage[FanOutShape2[SlotCommand, ResponseContext, RawSlotEvent]] { stage ⇒
 
     val slotCommandIn: Inlet[SlotCommand] = Inlet("SlotProcessor.slotCommandIn")
@@ -183,9 +185,20 @@ private object PoolSlot {
 
           debug("Establishing connection...")
 
-          currentConnectionInfo = Some(
+          val connectionSource =
             Source.fromGraph(connectionFlowSource.source)
-              .viaMat(connectionFlow)(Keep.right).toMat(Sink.fromGraph(connectionFlowSink.sink))(Keep.left).run()(subFusingMaterializer)
+              .viaMat(connectionFlow)(Keep.right)
+          val guardedConnectionSource =
+            if (requestTimeout.isFinite()) {
+              connectionSource.idleTimeout(FiniteDuration(requestTimeout.length, requestTimeout.unit))
+            } else {
+              connectionSource
+            }
+
+          currentConnectionInfo = Some(
+            guardedConnectionSource
+              .toMat(Sink.fromGraph(connectionFlowSink.sink))(Keep.left)
+              .run()(subFusingMaterializer)
           )
 
           connectionFlowSink.pull()

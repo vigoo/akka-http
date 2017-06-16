@@ -21,6 +21,7 @@ private[akka] final case class ConnectionPoolSettingsImpl(
   maxOpenRequests:    Int,
   pipeliningLimit:    Int,
   idleTimeout:        Duration,
+  requestTimeout:     Duration,
   connectionSettings: ClientConnectionSettings,
   transport:          ClientTransport)
   extends ConnectionPoolSettings {
@@ -32,8 +33,9 @@ private[akka] final case class ConnectionPoolSettingsImpl(
     maxOpenRequests:    Int,
     pipeliningLimit:    Int,
     idleTimeout:        Duration,
+    requestTimeout:     Duration,
     connectionSettings: ClientConnectionSettings) =
-    this(maxConnections, minConnections, maxRetries, maxOpenRequests, pipeliningLimit, idleTimeout, connectionSettings,
+    this(maxConnections, minConnections, maxRetries, maxOpenRequests, pipeliningLimit, idleTimeout, requestTimeout, connectionSettings,
       ClientTransport.TCP)
 
   require(maxConnections > 0, "max-connections must be > 0")
@@ -56,6 +58,7 @@ object ConnectionPoolSettingsImpl extends SettingsCompanion[ConnectionPoolSettin
       c getInt "max-open-requests",
       c getInt "pipelining-limit",
       c getPotentiallyInfiniteDuration "idle-timeout",
+      c getPotentiallyInfiniteDuration "request-timeout",
       ClientConnectionSettingsImpl.fromSubConfig(root, c.getConfig("client"))
     )
   }

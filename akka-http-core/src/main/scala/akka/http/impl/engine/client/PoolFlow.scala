@@ -79,7 +79,7 @@ private object PoolFlow {
       )
 
       val slots = Vector
-        .tabulate(maxConnections)(PoolSlot(_, connectionFlow, log))
+        .tabulate(maxConnections)(PoolSlot(_, connectionFlow, log, settings.requestTimeout))
         .map(b.add)
 
       val responseMerge = b.add(Merge[ResponseContext](maxConnections))
